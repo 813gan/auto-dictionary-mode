@@ -86,6 +86,11 @@ If this is nil, it is not never automatically."
   :group 'auto-dictionary
   :type 'number)
 
+(defcustom adict-ispell-timeout 1
+  "Seconds timeout for ispell process."
+  :group 'auto-dictionary
+  :type 'number)
+
 (defcustom adict-change-threshold .02
   "*Amount of buffer change required before the dictionary is guessed again.
 This is the quotient of changes to `buffer-modified-tick' and the buffer size.
@@ -890,7 +895,7 @@ You can use this, for instance, to localize the \" writes\" text in Gnus:
           (ispell-send-string (concat "^" word "\n"))
           (set-process-query-on-exit-flag ispell-process nil)
           (while (progn
-                   (accept-process-output ispell-process)
+                   (accept-process-output ispell-process adict-ispell-timeout)
                    (not (string= "" (car ispell-filter)))))
           (setq ispell-filter (cdr ispell-filter))
           (or ispell-filter
