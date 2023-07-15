@@ -857,61 +857,65 @@ You can use this, for instance, to localize the \" writes\" text in Gnus:
 
 
 (defun adict-evaluate-words-ispell (word-list &optional idle-only)
-  (let* ((old-local-dict ispell-local-dictionary)
-        (poss nil)
-        (old-rank nil)
-        (valid-dicts nil)
-        (adict-dictionaries-stats-not-checked nil)
-        (results nil)
-        (old-rank-raw nil)
-        (words
-         (remove-if-not (lambda (word) (string-match "^\\w+$" word))
-                        (delete-dups word-list))) )
-    (setq valid-dicts (seq-filter
-                       (lambda (d) (not (member d adict-ignored-dictionaries-ispell)))
-                       adict-dictionary-list-ispell))
-    (unless adict-dictionaries-stats
-      (setq adict-dictionaries-stats
-            (mapcar (lambda (d) (cons d 'nil)) valid-dicts)))
-    (setq adict-dictionaries-stats-not-checked
-          (mapcar 'car
-                  (seq-filter
-                   (lambda (d) (not (cdr d))) adict-dictionaries-stats)))
+  (with-temp-message "Analysing language in buffer..."
+    (let* ((old-local-dict ispell-local-dictionary)
+           (poss nil)
+           (old-rank nil)
+           (valid-dicts nil)
+           (adict-dictionaries-stats-not-checked nil)
+           (results nil)
+           (old-rank-raw nil)
+           (words
+            (cl-remove-if-not (lambda (word) (string-match "^\\w+$" word))
+                           (delete-dups word-list))) )
+      (setq valid-dicts (seq-filter
+                         (lambda (d) (not (member d adict-ignored-dictionaries-ispell)))
+                         adict-dictionary-list-ispell))
+      (unless adict-dictionaries-stats
+        (setq adict-dictionaries-stats
+              (mapcar (lambda (d) (cons d 'nil)) valid-dicts)))
+      (setq adict-dictionaries-stats-not-checked
+            (mapcar 'car
+                    (seq-filter
+                     (lambda (d) (not (cdr d))) adict-dictionaries-stats)))
 
-    (dolist (dict-name adict-dictionaries-stats-not-checked)
-      (when (and idle-only (input-pending-p))
-        (message "Aborting lang analysis due to pending user input")
-        (return))
-      (setq ispell-local-dictionary dict-name)
-      (setcdr (assoc dict-name adict-dictionaries-stats) 0)
-      ;; following code is copy-paste from `flyspell-word'
-      (if (eq 'error
-              (condition-case nil
-                  (ispell-accept-buffer-local-defs)
-                (error 'error)))
-          (add-to-list 'adict-ignored-dictionaries-ispell dict-name)
-        (dolist (word words)
-          (ispell-send-string "%\n")
-          (ispell-send-string (concat "^" word "\n"))
-          (set-process-query-on-exit-flag ispell-process nil)
-          (while (progn
-                   (accept-process-output ispell-process adict-ispell-timeout)
-                   (not (string= "" (car ispell-filter)))))
-          (setq ispell-filter (cdr ispell-filter))
-          (or ispell-filter
-	      (setq ispell-filter '(*)))
-          (if (consp ispell-filter)
-	      (setq poss (ispell-parse-output (car ispell-filter))))
-          (when (eq poss 't)
-            (setq old-rank (alist-get dict-name adict-dictionaries-stats))
-            (setcdr (assoc dict-name adict-dictionaries-stats) (1+ old-rank)) ))))
-    (setq ispell-local-dictionary old-local-dict)
+      (dolist (dict-name adict-dictionaries-stats-not-checked)
+        (when (and idle-only (input-pending-p))
+          (message "Aborting lang analysis due to pending user input")
+          (return))
+        (setq ispell-local-dictionary dict-name)
+        (setcdr (assoc dict-name adict-dictionaries-stats) 0)
+        ;; following code is copy-paste from `flyspell-word'
+        (if (eq 'error
+                (condition-case nil
+                    (ispell-accept-buffer-local-defs)
+                  (error 'error)))
+            (add-to-list 'adict-ignored-dictionaries-ispell dict-name)
+          (dolist (word words)
+            (ispell-send-string "%\n")
+            (ispell-send-string (concat "^" word "\n"))
+            (set-process-query-on-exit-flag ispell-process nil)
+            (while (progn
+                     (when (and idle-only (input-pending-p))
+                       (message "Aborting lang analysis due to pending user input")
+                       (return))
+                     (accept-process-output ispell-process adict-ispell-timeout)
+                     (not (string= "" (car ispell-filter)))))
+            (setq ispell-filter (cdr ispell-filter))
+            (or ispell-filter
+	        (setq ispell-filter '(*)))
+            (if (consp ispell-filter)
+	        (setq poss (ispell-parse-output (car ispell-filter))))
+            (when (eq poss 't)
+              (setq old-rank (alist-get dict-name adict-dictionaries-stats))
+              (setcdr (assoc dict-name adict-dictionaries-stats) (1+ old-rank)) ))))
+      (setq ispell-local-dictionary old-local-dict)
 
-    (setq results adict-dictionaries-stats)
-    (setq adict-dictionaries-stats nil)
+      (setq results adict-dictionaries-stats)
+      (setq adict-dictionaries-stats nil)
 
-     (caar (sort results (lambda (x y) (> (cdr x) (cdr y)))))
-     ))
+      (caar (sort results (lambda (x y) (> (cdr x) (cdr y)))))
+      )))
 
 ;;; Functions for 3rd Party Use ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
